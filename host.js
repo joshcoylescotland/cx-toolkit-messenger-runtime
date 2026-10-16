@@ -1,4 +1,6 @@
 const p=new URLSearchParams(location.search), environment=p.get('environment'), deploymentId=p.get('deploymentId'), scriptHost=p.get('bootstrapHost');
+let participantData=[];try{const raw=JSON.parse(p.get('participantData')||'[]');if(Array.isArray(raw))participantData=raw.filter(x=>x&&typeof x.key==='string'&&typeof x.value==='string'&&x.key.trim()).map(x=>({key:x.key.trim(),value:x.value}))}catch{}
+function applyParticipantData(){if(!participantData.length)return;const customAttributes=Object.fromEntries(participantData.map(x=>[x.key,x.value]));cmd('command','Database.set',{messaging:{customAttributes}});diag({event:'participant-data-applied',count:participantData.length})}
 const log=document.querySelector('#log');
 function notify(event,message,extra={}){try{if(window.parent!==window)window.parent.postMessage({source:'cx-toolkit-messenger-web-host',type:'status',event,message,...extra},'*')}catch{}}
 function diag(x){log.textContent+=JSON.stringify({time:new Date().toISOString(),...x})+'\n'}
@@ -15,8 +17,8 @@ let timer=null;function startBounds(){clearInterval(timer);timer=setInterval(rep
 window.addEventListener('message',e=>{if(e.data?.source==='cx-toolkit-parent'&&e.data?.type==='request-bounds')reportBounds()});
 if(!environment||!deploymentId){notify('error','Missing environment or deployment ID.')}else{
  const genesys=function(...args){genesys.q=genesys.q||[];genesys.q.push(args)};genesys.q=[];genesys.t=Date.now();genesys.c={environment,deploymentId};window.Genesys=genesys;
- cmd('subscribe','Messenger.ready',()=>{diag({event:'Messenger.ready'});notify('ready','Messenger.ready');startBounds()});
- cmd('subscribe','Messenger.opened',()=>{diag({event:'Messenger.opened'});notify('opened','Messenger opened');setTimeout(reportBounds,50);setTimeout(reportBounds,300)});
+ cmd('subscribe','Messenger.ready',()=>{diag({event:'Messenger.ready'});notify('ready','Messenger.ready');startBounds();cmd('subscribe','MessagingService.started',applyParticipantData)});
+ cmd('subscribe','Messenger.opened',()=>{applyParticipantData();diag({event:'Messenger.opened'});notify('opened','Messenger opened');setTimeout(reportBounds,50);setTimeout(reportBounds,300)});
  cmd('subscribe','Messenger.closed',()=>{diag({event:'Messenger.closed'});notify('closed','Messenger closed');setTimeout(reportBounds,50);setTimeout(reportBounds,300)});
  const s=document.createElement('script');s.id='genesys-messenger-bootstrap';s.src=`https://${scriptHost}/genesys-bootstrap/genesys.min.js`;s.async=true;s.charset='utf-8';s.onload=()=>notify('bootstrap','Genesys bootstrap loaded');s.onerror=()=>notify('error','Genesys bootstrap failed to load');document.head.appendChild(s);
 }
