@@ -23,11 +23,17 @@ if(!environment||!deploymentId){notify('error','Missing environment or deploymen
  const s=document.createElement('script');s.id='genesys-messenger-bootstrap';s.src=`https://${scriptHost}/genesys-bootstrap/genesys.min.js`;s.async=true;s.charset='utf-8';s.onload=()=>notify('bootstrap','Genesys bootstrap loaded');s.onerror=()=>notify('error','Genesys bootstrap failed to load');document.head.appendChild(s);
 }
 
-// CX Toolkit runtime v3: explicit test-session teardown.
+// CX Toolkit runtime v4: clear the active conversation and wait for Genesys to confirm it.
+let toolkitClearInFlight=false;
 function clearToolkitMessengerSession(){
+  if(toolkitClearInFlight)return;
+  toolkitClearInFlight=true;
   let finished=false;
-  const done=(mode)=>{if(finished)return;finished=true;diag({event:'toolkit-session-cleared',mode});notify('cleared','Messenger test session cleared',{mode})};
-  const clearStorage=()=>{try{cmd('command','Messenger.clear',{},()=>done('conversation+storage'),()=>done('conversation'))}catch{done('conversation')}};
-  try{cmd('command','MessagingService.clearConversation',{},clearStorage,clearStorage);setTimeout(clearStorage,900)}catch{clearStorage()}
+  const done=(mode)=>{if(finished)return;finished=true;toolkitClearInFlight=false;diag({event:'toolkit-session-cleared',mode});notify('cleared','Messenger test conversation cleared',{mode})};
+  const fallback=setTimeout(()=>done('timeout'),4000);
+  try{cmd('subscribe','MessagingService.conversationCleared',()=>{clearTimeout(fallback);done('conversationCleared')})}catch{}
+  try{
+    cmd('command','MessagingService.clearConversation',{},()=>{diag({event:'clearConversation-command-complete'})},e=>{diag({event:'clearConversation-command-error',message:String(e||'')});clearTimeout(fallback);done('command-error')});
+  }catch(e){diag({event:'clearConversation-exception',message:e.message});clearTimeout(fallback);done('exception')}
 }
 window.addEventListener('message',e=>{if(e.data?.source==='cx-toolkit-parent'&&e.data?.type==='clear-session')clearToolkitMessengerSession()});
