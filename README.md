@@ -1,2 +1,2 @@
-# CX Toolkit Messenger Runtime v2
-Static HTTPS runtime for CX Toolkit. v2 adds participant/custom attribute support while preserving the genuine Genesys Messenger UI.
+# CX Toolkit Messenger Runtime v3
+Static HTTPS runtime for the CX Toolkit Chrome extension. v3 adds an explicit Toolkit teardown command that asks Genesys Messenger to clear the active conversation/session before a test runtime is destroyed or a deployment is switched.

@@ -22,3 +22,12 @@ if(!environment||!deploymentId){notify('error','Missing environment or deploymen
  cmd('subscribe','Messenger.closed',()=>{diag({event:'Messenger.closed'});notify('closed','Messenger closed');setTimeout(reportBounds,50);setTimeout(reportBounds,300)});
  const s=document.createElement('script');s.id='genesys-messenger-bootstrap';s.src=`https://${scriptHost}/genesys-bootstrap/genesys.min.js`;s.async=true;s.charset='utf-8';s.onload=()=>notify('bootstrap','Genesys bootstrap loaded');s.onerror=()=>notify('error','Genesys bootstrap failed to load');document.head.appendChild(s);
 }
+
+// CX Toolkit runtime v3: explicit test-session teardown.
+function clearToolkitMessengerSession(){
+  let finished=false;
+  const done=(mode)=>{if(finished)return;finished=true;diag({event:'toolkit-session-cleared',mode});notify('cleared','Messenger test session cleared',{mode})};
+  const clearStorage=()=>{try{cmd('command','Messenger.clear',{},()=>done('conversation+storage'),()=>done('conversation'))}catch{done('conversation')}};
+  try{cmd('command','MessagingService.clearConversation',{},clearStorage,clearStorage);setTimeout(clearStorage,900)}catch{clearStorage()}
+}
+window.addEventListener('message',e=>{if(e.data?.source==='cx-toolkit-parent'&&e.data?.type==='clear-session')clearToolkitMessengerSession()});
